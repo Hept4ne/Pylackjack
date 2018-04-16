@@ -3,20 +3,24 @@
 import sys
 from random import randint, choice
 
-#Strings (too long to fit in PEP-8 guidelines otherwise) and global variables:
-
-optionlist = \
-    "Hit (1), Stand (2), Double down (3), Surrender (4), or Options (5)."
-
-optionsmenuchoices = \
-    "View Win/Lose Stats (1), Reset Stats (2), Return (3), or Quit (n)"
+#Global variables and strings (too long to fit in PEP-8 guidelines otherwise):
 
 wins = 0
 loses = 0
 totalplays = 0
 ratio = 0
-rationotset = True
 money = 100
+rationotset = True
+
+optionlist = \
+    "Hit (1), Stand (2), Double down (3), Surrender (4), or Options (5)."
+
+optionsmenuchoices = \
+    "View Player Stats (1), Reset Stats (2), Return (3), or Quit (n)"
+
+stats = \
+      "Wins: %i, Loses: %i, Ratio: %f, Money: %i, Times played: %i"%\
+      (wins, loses, round(ratio, 1), money, totalplays)
 
 #Classes:
 
@@ -119,8 +123,7 @@ class p(actor):
             print ("---\n--\n-")
             sys.exit()
         elif int(ochoice) == 1:
-            print ("Wins: %i, Loses: %i, Total times played: %i, Ratio: %f"%\
-                   (wins, loses, totalplays, round(ratio, 1)))
+            print (stats)
         elif int(ochoice) == 2:
             self.resetstats = True
             print ("Stats reset.")
@@ -128,11 +131,12 @@ class p(actor):
             self.inoptions = False
             print ("-")
             self.gethand(False)
-        
 
 ##################
 
 playing = True
+
+print ("Welcome to blackjack.")
 
 while playing:
 
@@ -142,12 +146,28 @@ while playing:
     player = p()
     roundstart = True
 
+    print ("-\n--\n---")
+
+    #Placing your bet.
+
+    bet = input("You have %i dollarydoos. Place your bet: "%(money))
+    while not bet.isdigit() or int(bet) > money:
+        #If the input is not a digit,
+        #or if the amount betted exceeds player's balance.
+        if not bet.isdigit():
+            bet = input("Invalid input.\nPlace your bet: ")
+        elif int(bet) > money:
+            bet = input("Insufficient funds.\nPlace your bet: ")
+    bet = int(bet)
+    money -= bet
+
     if roundstart:
         #Starts the round. Sets up the dealer's initial hand,
         #dealer's hole (hidden/face down) card, and
         #gives the player their initial two cards.
         
-        print ("Welcome to blackjack.\n---\nDealer's initial hand:")
+        print ("Dealer's initial hand:")
+        
         dealer.cardpick()
         dealer.holecardpick()
         
@@ -191,27 +211,39 @@ while playing:
             break
         elif int(pchoice) == 3:
             #If Double Down is chosen, double bets, pick one card, then stand.
-            print ("Player doubled down. Bets doubled.")
-            dealer.turn = True
-            player.doubledown()
-            print ("-")
-            break
+            if bet > money:
+                print ("Insufficient funds.")
+            else:
+                money -= bet
+                bet *= 2
+                print ("Player doubled down. Bets doubled.")
+                print ("You now have %i dollarydoos."%(money))
+                dealer.turn = True
+                player.doubledown()
+                print ("-")
+                break
         elif int(pchoice) == 4:
             dealer.turn = False
             player.surrender = True
             break
         elif int(pchoice) == 5:
+            #Brings up the options menu.
             player.inoptions = True
             while player.inoptions:
                 if totalplays > 0 and rationotset:
+                    #Sets the ratio to wins/totalplays.
+                    #This prevents division by zero from totalplays == 0.
                     ratio = wins/totalplays
                     rationotset = False
                 player.options()
                 if player.resetstats:
+                    #Resets player's stats.
                     wins = 0
                     loses = 0
                     totalplays = 0
                     ratio = 0
+                    money = 100
+                    bet = 0
                     rationotset = True
                     player.resetstats = False
 
@@ -249,6 +281,7 @@ while playing:
     #Game condition check:
     if player.surrender:
         print ("Player surrendered. House takes half of bets.")
+        money += int(bet/2)
     else:
         if player.value > 21:
             print ("Player busted! You lose.")
@@ -256,14 +289,17 @@ while playing:
             loses += 1
         elif dealer.value > 21:
             print ("Dealer busted! You win!")
+            money += bet*2
             dealer.busted = True
             wins += 1
         if not (player.busted or dealer.busted):
             if player.value > dealer.value:
                 print ("Player hand is greater than dealer's. You Win!")
+                money += bet*2
                 wins += 1
             elif player.value == dealer.value:
                 print ("Player's hand is the same as the dealer's. Tie.")
+                money += bet
             else:
                 print ("Player's hand is less than dealer's. You Lose.")
                 loses += 1
