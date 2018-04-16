@@ -5,7 +5,7 @@ from random import randint, choice
 
 #Strings (too long to fit in PEP-8 guidelines otherwise):
 
-optionlist = "Hit (1), Stand (2), Double down (3), Split (4), or Surrender (5)."
+optionlist = "Hit (1), Stand (2), Double down (3), or Surrender (4)."
 
 #Classes:
 
@@ -26,7 +26,8 @@ class actor(object):
            "X's hand is now worth Y." instead of "X's hand is worth Y."'''
         if nowworth:
             print ("%s's hand is now worth %i."%(self.name, self.value))
-        print ("%s's hand is worth %i."%(self.name, self.value))
+        else:
+            print ("%s's hand is worth %i."%(self.name, self.value))
     def silentcardpick(self):
         '''Picks card with no announcement.'''
         cpick = randint(1,14)
@@ -81,6 +82,7 @@ class d(actor):
             print (choice(self.kqjlist))
         else:
             print (str(self.holecard))
+        self.gethand(False)
 
 class p(actor):
     '''Player class.'''
@@ -89,6 +91,10 @@ class p(actor):
     surrender = False
     def __init__(self):
         pass
+    def doubledown(self):
+        '''Doubles the player's bet, then forces them to stand
+           after picking one more card.'''
+        self.cardpick()
 
 ##################
 
@@ -131,7 +137,6 @@ while playing:
         if (player.value > 21 and not player.gotace)\
            or (player.value > 21 and player.gotace and player.ace == 1):
             #Checks if the player busted. Instant lose.
-            player.turn = False
             dealer.turn = False
             break
         if player.value > 21 and player.gotace and player.ace == 11:
@@ -139,7 +144,7 @@ while playing:
             print ("Player had a soft bust. Ace is now worth 1.")
             player.softace()
         pchoice = input("Choose to %s\n"%(optionlist) + "Choice: ")
-        while not pchoice.isdigit() or int(pchoice) not in range(1,6):
+        while not pchoice.isdigit() or int(pchoice) not in range(1,5):
             #If the choice is not a digit or not in the range of choices.
             print ("Invalid input.")
             pchoice = input("Choice: ")
@@ -149,10 +154,18 @@ while playing:
         elif int(pchoice) == 2:
             #If Stand is chosen, end turn.
             print ("Player stood.\n-")
-            player.turn = False
             dealer.turn = True
-        elif int(pchoice) in range(3,6):
-            print ("WIP")
+            break
+        elif int(pchoice) == 3:
+            #If Double Down is chosen, double bets, pick one card, then stand.
+            print ("Player doubled down. Bets doubled.\n-")
+            dealer.turn = True
+            player.doubledown()
+            break
+        elif int(pchoice) == 4:
+            dealer.turn = False
+            player.surrender = True
+            break
 
     #Dealer's turn.
     while dealer.turn:
@@ -177,8 +190,8 @@ while playing:
             #If the dealer got more than 21 (busted).
             print ("-")
             dealer.turn = False
-        if (dealer.value >= 17 and not dealer.gotace)\
-           or (dealer.value >= 17 and dealer.gotace and dealer.ace == 1):
+        if (dealer.value in range(17, 22) and not dealer.gotace)\
+           or (dealer.value in range(17, 22) and dealer.gotace):
             #If the dealer's hand is >= 17 without an ace,
             #or the dealer's hand  is > 17 with the ace already used (hard).
             print ("Dealer stood.\n-")
@@ -186,28 +199,31 @@ while playing:
             break
 
     #Game condition check:
-    if player.value > 21:
-        print ("Player busted! You lose.")
-        player.busted = True
-    if dealer.value > 21:
-        print ("Dealer busted! You win!")
-        dealer.busted = True
-    if not (player.busted or dealer.busted):
-        if player.value > dealer.value:
-            print ("Player hand is greater than dealer's. You Win!")
-        elif player.value == dealer.value:
-            print ("Player's hand is the same as the dealer's. Tie.")
-        else:
-            print ("Player's hand is less than dealer's. You Lose.")
+    if player.surrender:
+        print ("Player surrendered. House takes half of bets.")
+    else:
+        if player.value > 21:
+            print ("Player busted! You lose.")
+            player.busted = True
+        elif dealer.value > 21:
+            print ("Dealer busted! You win!")
+            dealer.busted = True
+        if not (player.busted or dealer.busted):
+            if player.value > dealer.value:
+                print ("Player hand is greater than dealer's. You Win!")
+            elif player.value == dealer.value:
+                print ("Player's hand is the same as the dealer's. Tie.")
+            else:
+                print ("Player's hand is less than dealer's. You Lose.")
 
     #Resets the game.
-    print ("-")
     while True:
-        print ("New game? y/n")
+        print ("-\nNew game? y/n")
         newgameinput = input("Choice: ")
         if newgameinput in "Yy":
             break
         elif newgameinput in "Nn":
+            print ("---\n--\n-")
             sys.exit()
         print ("Invalid input.")
     print ("---\n--\n-")
