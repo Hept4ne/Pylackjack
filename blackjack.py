@@ -3,9 +3,20 @@
 import sys
 from random import randint, choice
 
-#Strings (too long to fit in PEP-8 guidelines otherwise):
+#Strings (too long to fit in PEP-8 guidelines otherwise) and global variables:
 
-optionlist = "Hit (1), Stand (2), Double down (3), or Surrender (4)."
+optionlist = \
+    "Hit (1), Stand (2), Double down (3), Surrender (4), or Options (5)."
+
+optionsmenuchoices = \
+    "View Win/Lose Stats (1), Reset Stats (2), Return (3), or Quit (n)"
+
+wins = 0
+loses = 0
+totalplays = 0
+ratio = 0
+rationotset = True
+money = 100
 
 #Classes:
 
@@ -89,12 +100,35 @@ class p(actor):
     name = "Player"
     stand = False
     surrender = False
+    inoptions = False
+    resetstats = False
     def __init__(self):
         pass
     def doubledown(self):
         '''Doubles the player's bet, then forces them to stand
            after picking one more card.'''
         self.cardpick()
+    def options(self):
+        print ("-Options Menu-")
+        ochoice = input("Choose to %s\n"%(optionsmenuchoices) + "Choice: ")
+        while ochoice not in "Nn" \
+              and not (ochoice.isdigit() and int(ochoice) in range(1, 4)):
+            #If the choice is not a digit or not in the range of choices.
+            ochoice = input("Invalid input.\nChoice: ")
+        if ochoice in "Nn":
+            print ("---\n--\n-")
+            sys.exit()
+        elif int(ochoice) == 1:
+            print ("Wins: %i, Loses: %i, Total times played: %i, Ratio: %f"%\
+                   (wins, loses, totalplays, round(ratio, 1)))
+        elif int(ochoice) == 2:
+            self.resetstats = True
+            print ("Stats reset.")
+        elif int(ochoice) == 3:
+            self.inoptions = False
+            print ("-")
+            self.gethand(False)
+        
 
 ##################
 
@@ -144,10 +178,9 @@ while playing:
             print ("Player had a soft bust. Ace is now worth 1.")
             player.softace()
         pchoice = input("Choose to %s\n"%(optionlist) + "Choice: ")
-        while not pchoice.isdigit() or int(pchoice) not in range(1,5):
+        while not pchoice.isdigit() or int(pchoice) not in range(1,6):
             #If the choice is not a digit or not in the range of choices.
-            print ("Invalid input.")
-            pchoice = input("Choice: ")
+            pchoice = input("Invalid input.\nChoice: ")
         if int(pchoice) == 1:
             #If Hit is chosen, randomly selects a card.
             player.cardpick()
@@ -158,14 +191,29 @@ while playing:
             break
         elif int(pchoice) == 3:
             #If Double Down is chosen, double bets, pick one card, then stand.
-            print ("Player doubled down. Bets doubled.\n-")
+            print ("Player doubled down. Bets doubled.")
             dealer.turn = True
             player.doubledown()
+            print ("-")
             break
         elif int(pchoice) == 4:
             dealer.turn = False
             player.surrender = True
             break
+        elif int(pchoice) == 5:
+            player.inoptions = True
+            while player.inoptions:
+                if totalplays > 0 and rationotset:
+                    ratio = wins/totalplays
+                    rationotset = False
+                player.options()
+                if player.resetstats:
+                    wins = 0
+                    loses = 0
+                    totalplays = 0
+                    ratio = 0
+                    rationotset = True
+                    player.resetstats = False
 
     #Dealer's turn.
     while dealer.turn:
@@ -205,19 +253,24 @@ while playing:
         if player.value > 21:
             print ("Player busted! You lose.")
             player.busted = True
+            loses += 1
         elif dealer.value > 21:
             print ("Dealer busted! You win!")
             dealer.busted = True
+            wins += 1
         if not (player.busted or dealer.busted):
             if player.value > dealer.value:
                 print ("Player hand is greater than dealer's. You Win!")
+                wins += 1
             elif player.value == dealer.value:
                 print ("Player's hand is the same as the dealer's. Tie.")
             else:
                 print ("Player's hand is less than dealer's. You Lose.")
+                loses += 1
 
     #Resets the game.
     while True:
+        totalplays += 1
         print ("-\nNew game? y/n")
         newgameinput = input("Choice: ")
         if newgameinput in "Yy":
