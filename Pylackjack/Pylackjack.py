@@ -21,19 +21,13 @@ colors = {
 fpsclock = pygame.time.Clock()
 deltaclock = pygame.time.Clock()
 
-(width, height) = (480, 640)
+(screen_width, screen_height) = (480, 640)
 
-screen = pygame.display.set_mode((width, height))
+screen = pygame.display.set_mode((screen_width, screen_height))
 screen_rect = screen.get_rect()
 pygame.display.set_caption("PyLackJack")
 
-cards = spritesheet.spritesheet('sprites/cardsheet.png')
-
-image = cards.image_at((0, 0, 71, 96), colorkey=colors["magenta"])
-
-rect = image.get_rect()
-rect.x = 0
-rect.y = 0
+betting = True
 
 #Functions:
 
@@ -41,6 +35,74 @@ def quitgame():
     print ("Exited successfully.")
     pygame.quit()
     sys.exit()
+
+#Classes:
+
+class text(object):
+    '''Object for text rendering.'''
+    def __init__(self):
+        self.self = self
+        self.font = pygame.font.SysFont("arial", 28)
+    def texttoprint(self):
+        pass
+    def print_text(self, inp, x, y):
+        '''Prints text to the screen.
+           inp is the text, x and y is the change from the screen center.'''
+        self.string = inp
+        self.text = self.font.render(self.string, False, (colors["black"]))
+        self.rect = self.text.get_rect()
+        self.centerx = ((screen_width/2) - self.text.get_width()//2) + x
+        self.centery = ((screen_height/2) - self.text.get_height()//2) + y
+        screen.blit(self.text, (self.centerx, self.centery))
+        
+
+class card(object):
+    '''Class for card objects.'''
+    def __init__(self):
+        self.self = self
+        self.key = colors["magenta"]
+        self.cards = spritesheet.spritesheet('sprites/cardsheet.png')
+
+        #Card indices and the width and height of an individual card:
+        
+        self.cix = 75
+        self.ciy = 100
+        self.width = 71
+        self.height = 96
+        
+        #Use multiples of cix and ciy to access the cards in the deck.
+        #cix * 0 = spades, * 1 = club, * 2 = heart, * 3 = diamond.
+        #ciy * 0 thru 2 = king, queen, joker respectively.
+        # ciy * 3 thru 12 = ace, and the number cards.
+        #(e.g. 3 will be at 3 + 2 = 5
+
+        self.index = (self.cix*0, self.ciy*0, self.width, self.height)
+        self.image = self.cards.image_at(self.index, colorkey=self.key)
+        self.rect = self.image.get_rect()
+        self.rect.x = 0
+        self.rect.y = 0
+        
+    def draw(self, x, y):
+        self.rect.x = x
+        self.rect.y = y
+        screen.blit(self.image, self.rect)
+        
+
+class actor(object):
+    '''actor class for variables and methods shared by player and dealer'''
+    pass
+
+class d(actor):
+    pass
+
+class p(actor):
+    pass
+
+#Variables inheriting from the classes:
+
+startup = text()
+
+king = card()
 
 #Game loop:
 
@@ -54,9 +116,8 @@ while True:
         if event.type == QUIT:
             quitgame()
         if event.type == pygame.MOUSEBUTTONDOWN:
-            (mouseX, mouseY) = pygame.mouse.get_pos()
-            rect.x, rect.y = mouseX, mouseY
-            print (mouseX, mouseY)
+            (mousex, mousey) = pygame.mouse.get_pos()
+            if mousex < 
         elif event.type == pygame.MOUSEBUTTONUP:
             #Checks if the mouseclick is released.
             pass
@@ -66,12 +127,18 @@ while True:
     keys_pressed = pygame.key.get_pressed()
     if (keys_pressed[K_LALT] or keys_pressed[K_RALT]) and keys_pressed[K_F4]:
         quitgame()
+
     #---
 
     screen.fill(colors["dark green"])
 
-    screen.blit(image, rect)
-    
+    startup.print_text("Welcome to blackjack.", 0, 0)
+    if betting:
+        startup.print_text("Place your bet:", 0, 32)
+        startup.print_text("%i"%(100), 0, 96)
+
+    king.draw((screen_width/2) - (king.width/2), 120)
+            
     pygame.display.update()
     fpsclock.tick(60)
             
