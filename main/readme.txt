@@ -1,4 +1,6 @@
-Created by J. Hoff a.k.a. Hexadecane.
+---Created by J. H. a.k.a. Hexadecane.---
+
+Tools used: PyCharm, Aseprite
 
 Card sprites are originally from Windows 98; Credits to Microsoft for them.
 
