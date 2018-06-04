@@ -1,8 +1,9 @@
 import pygame
+import sys
 from spritesheet import SpriteSheet
-from tkinter import *
+import ctypes
 from pygame.locals import *
-from random import randint  # , choice
+from random import choice
 
 # Initializes pygame and creates the game icon:
 
@@ -10,6 +11,7 @@ pygame.init()
 
 gameIcon = pygame.image.load('sprites/pylackjack.png')
 pygame.display.set_icon(gameIcon)
+pygame.display.set_caption("Pylackjack")
 
 # Colors! These are chosen using a tuple of RGB values:
 
@@ -21,6 +23,7 @@ blue = (0, 0, 255)
 dark_green = (0, 128, 0)
 magenta = (255, 0, 255)
 keycolor = (217, 87, 99)
+msgray = (189, 189, 189)
 
 # Global variables:
 
@@ -34,10 +37,8 @@ screen_centery = (screen_height/2)
 
 screen = pygame.display.set_mode((screen_width, screen_height))
 screen_rect = screen.get_rect()
-pygame.display.set_caption("PyLackJack")
 
-# Todo: WRITE SOME MORE COMMENTS!
-# Todo: add polish!
+# Todo: WRITE MORE COMMENTS! refactor/simplify more! add polish!
 
 # Functions:
 
@@ -69,15 +70,12 @@ def message_display(text, font="microsoft sans serif", size=24, center=True, x=0
 
 def end_bet():
     """Ends the bet and initiates the start of the round."""
-    global Bet, Player, actiontimer, betting, roundstart, playing
-    if Bet.value > Player.available_money:
-        actiontimer = 60
-    else:
-        Player.available_money -= Bet.value
-        betting = False
-        playing = True
-        roundstart = True
-        initgame()
+    global Bet, Player, betting, roundstart, playing
+    Player.available_money -= Bet.value
+    betting = False
+    playing = True
+    roundstart = True
+    initround()
 
 
 def draw_rect(rectcolor, x, y, w, h, center=False):
@@ -103,20 +101,135 @@ def draw_img(img, x=0, y=0, center=True, colorkey=magenta):
     screen.blit(img, img_rect)
 
 
+def initround():
+    """Gives the player and dealer their initial cards at the start of the round."""
+    # Player's cards:
+    CardDraw(Player, x=-64, y=121)
+    CardDraw(Player, x=+64, y=121)
+    # Dealer's card:
+    CardDraw(Dealer, x=-64, y=-152)
+
+
+def restartround():
+    """Restarts the round."""
+    global restart
+    restart = True
+
+
+def endround():
+    global roundstart, betting, standing, endgame
+    roundstart = False
+    betting = False
+    standing = False
+    endgame = False
+
+def showabout():
+    """Displays the about message."""
+    creditsmessage = "Pylackjack 0.9\nCopyright (c) 2018 Hexadecane\nLicensed under the MIT License"
+    ctypes.windll.user32.MessageBoxW(0, creditsmessage, "About", 64)
+
+
+def resetstats():
+    """Resets the player's stats, and the bet value."""
+    global Player, Bet
+    Player.available_money = 100
+    Player.wins = 0
+    Player.loses = 0
+    Bet.value = 100
+    restartround()
+
+
+def sprite_set(w, h, spritesheet, x, y, sloc_n, sloc_y=0):
+    """Sets the sprite currently being used. sloc_n and sloc_y are multipliers
+       that change the index on the spritesheet of the active sprite.
+       The DropMenu class doesn't use sloc_y, but the ImgButton class does."""
+    index = (sloc_n*w, sloc_y*h, w, h)
+    image = spritesheet.image_at(index)
+    image_rect = image.get_rect()
+    image_rect.x = x
+    image_rect.y = y
+    return index, image, image_rect, image_rect.x, image_rect.y
+
+
 # Classes:
+
+class DropMenu:
+    """Component class for drop-menu buttons. Attaches to the botton of the button."""
+    activate = False
+
+    def __init__(self, spritesheet_img):
+        self.ss = SpriteSheet(spritesheet_img[:-4] + "_sub.png")
+        self.w, self.h = self.ss.sheet.get_size()
+        self.w /= 2
+        spritesetter = sprite_set(self.w, self.h, self.ss, 0, 0, 0)
+        self.index, self.image, self.image_rect, self.image_rect.x, self.image_rect.y = spritesetter
+        self.action = None
+
+    def draw(self, x=0, y=0):
+        self.image_rect.x = x
+        self.image_rect.y = y
+        mouse = pygame.mouse.get_pos()
+        click = pygame.mouse.get_pressed()
+        if self.image_rect.collidepoint(mouse):
+            spritesetter = sprite_set(self.w, self.h, self.ss, x, y, 1)
+            self.index, self.image, self.image_rect, self.image_rect.x, self.image_rect.y = spritesetter
+            if click[0] == 1 and self.action is not None:
+                self.action()
+        else:
+            spritesetter = sprite_set(self.w, self.h, self.ss, x, y, 0)
+            self.index, self.image, self.image_rect, self.image_rect.x, self.image_rect.y = spritesetter
+
+        screen.blit(self.image, self.image_rect)
+
+
+class DropMenuButton:
+    """Object class for image-based drop-menu buttons. Has three states for the drop menu button."""
+    activate = False
+
+    def __init__(self, w, h, spritesheet_img):
+        """Defines the width, height, and spritesheet image of the menu button."""
+        self.ss = SpriteSheet(spritesheet_img)
+        self.filename = spritesheet_img
+        self.w = w
+        self.h = h
+        self.dropmenu = DropMenu(spritesheet_img)
+
+    def draw(self, x=0, y=0, action=None):
+        """Draws the drop menu button."""
+        global menutimer
+        mouse = pygame.mouse.get_pos()
+        click = pygame.mouse.get_pressed()
+        index, image, image_rect, image_rect.x, image_rect.y = sprite_set(self.w, self.h, self.ss, x, y, 0)
+        dmenu_rect = self.dropmenu.image_rect
+        self.dropmenu.action = action
+        if image_rect.collidepoint(mouse) and not DropMenuButton.activate:
+            index, image, image_rect, image_rect.x, image_rect.y = sprite_set(self.w, self.h, self.ss, x, y, 1)
+            if click[0] == 1 and menutimer == 0:
+                DropMenuButton.activate = True
+                menutimer = 10
+        if (image_rect.collidepoint(mouse) or dmenu_rect.collidepoint(mouse)) and DropMenuButton.activate:
+            index, image, image_rect, image_rect.x, image_rect.y = sprite_set(self.w, self.h, self.ss, x, y, 2)
+            if click[0] == 1 and menutimer == 0:
+                DropMenuButton.activate = False
+                menutimer = 10
+            self.dropmenu.draw(x=image_rect.left, y=image_rect.bottom)
+        if not (image_rect.collidepoint(mouse) or dmenu_rect.collidepoint(mouse)):
+            self.dropmenu.image_rect.x = screen_width
+        if (mouse[1] > image_rect.y + self.h + self.dropmenu.h) and DropMenuButton.activate:
+            DropMenuButton.activate = False
+        screen.blit(image, image_rect)
+
 
 class ImgButton:
     """Object class for image-based buttons. Only buttons with binary states are supported."""
     def __init__(self, w, h, spritesheet_img, sloc_x, sloc_y):
         """Defines the width, height, a sprite-sheet image, and sprite location on the sheet."""
-        self.spritesheet = SpriteSheet(spritesheet_img)
+        self.ss = SpriteSheet(spritesheet_img)
         self.w = w
         self.h = h
-        self.sloc_x = sloc_x  # Multiplier for the chosen sprite's location on the sprite-sheet.
-        self.sloc_y = sloc_y  # Each increase of one moves by the width and/or height of the sprite size.
+        self.s_x = sloc_x  # Multiplier for the chosen sprite's location on the sprite-sheet.
+        self.s_y = sloc_y  # Each increase of one moves by the width and/or height of the sprite size.
         self.releaseactivate = False
-        self.timeouttimer = 30
-        self.canexec = True
 
     def draw(self, x=0, y=0, action=None, center=False, act_on_release=False, canmoveoff=False):
         """Draws an image-based button object and defines its action. If centered, the x and y coordinates
@@ -124,22 +237,14 @@ class ImgButton:
            act_on_release determines if the action will execute when the button is released."""
         mouse = pygame.mouse.get_pos()
         click = pygame.mouse.get_pressed()
-        index = (self.sloc_x*self.w, self.sloc_y*self.h, self.w, self.h)  # Index of the chosen sprite and its w and h.
-        image = self.spritesheet.image_at(index)
-        image_rect = image.get_rect()
         if center:
             x = (screen_centerx - (self.w/2)) + x
             y = (screen_centery - (self.h/2)) + y
-        image_rect.x = x
-        image_rect.y = y
+        spritesetter = sprite_set(self.w, self.h, self.ss, x, y, self.s_x, self.s_y)
+        index, image, image_rect, image_rect.x, image_rect.y = spritesetter
         if click[0] == 1 and action is not None and image_rect.collidepoint(mouse):
-            # This Sets a timer for the action to execute.
-            # This is useful if some condition is not met, so the action won't just run forever.
-            index = ((self.sloc_x+1)*self.w, self.sloc_y*self.h, self.w, self.h)
-            image = self.spritesheet.image_at(index)
-            image_rect = image.get_rect()
-            image_rect.x = x
-            image_rect.y = y
+            spritesetter = sprite_set(self.w, self.h, self.ss, x, y, (self.s_x+1), self.s_y)
+            index, image, image_rect, image_rect.x, image_rect.y = spritesetter
             screen.blit(image, image_rect)
             if not act_on_release:
                 action()
@@ -164,28 +269,43 @@ class CardDraw(pygame.sprite.Sprite):
     center = (screen_centerx - (width/2), screen_centery - (height/2))
 
     card_values = [10, 10, 10, 11, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    available_cards = [j for i in [[[i, e] for i in range(13)] for e in range(4)] for j in i]
+    nomorecards = False
 
-    def __init__(self, cchoice, csuit, targetactor, x=0, y=0, center=True):
+    def __init__(self, targetactor, x=0, y=0, center=True):
+        """Card drawer initialization. Removes a card from the deck, appends it to the target actor's card list,
+           adds to the target actor's hand value, and renders the card at the specified x and y coordinate."""
         pygame.sprite.Sprite.__init__(self)
-        self.index = (CardDraw.cix * csuit, CardDraw.ciy * cchoice, CardDraw.width, CardDraw.height)
-        self.image = CardDraw.cards.image_at(self.index, colorkey=keycolor)
-        self.image_rect = self.image.get_rect()
-        self.value = self.card_values[cchoice]
-        if center:
-            self.image_rect.x, self.image_rect.y = CardDraw.center[0] + x, CardDraw.center[1] + y
+
+        if not CardDraw.available_cards:  # Exception handling for when the deck runs out of cards.
+            CardDraw.nomorecards = True  # Under normal gameplay circumstances, it is impossible for this to happen.
         else:
-            self.image_rect.x = x
-            self.image_rect.y = y
-        targetactor.value += self.value
-        targetactor.cards.append(self)
-        if cchoice == 3:
-            targetactor.gotace = True
-        if len(targetactor.cards) > 2:
-            targetactor.cards[-1].image_rect.x = targetactor.cardoffset
-            if targetactor.cardoffset < 10:
-                targetactor.cardoffset = 130
+            cchoice, csuit = choice(CardDraw.available_cards)
+            CardDraw.available_cards.remove([cchoice, csuit])
+            self.index = (CardDraw.cix * csuit, CardDraw.ciy * cchoice, CardDraw.width, CardDraw.height)
+            self.image = CardDraw.cards.image_at(self.index, colorkey=keycolor)
+            self.image_rect = self.image.get_rect()
+            self.value = self.card_values[cchoice]
+            if center:
+                self.image_rect.x, self.image_rect.y = CardDraw.center[0] + x, CardDraw.center[1] + y
             else:
-                targetactor.cardoffset -= 11
+                self.image_rect.x = x
+                self.image_rect.y = y
+            targetactor.value += self.value
+            targetactor.cards.append(self)
+            if cchoice == 3:
+                targetactor.gotace = True
+            if len(targetactor.cards) > 2:
+                targetactor.cards[-1].image_rect.x = targetactor.cardoffset
+                if targetactor.cardoffset <= 8:
+                    targetactor.cardoffset = 128
+                else:
+                    targetactor.cardoffset -= 12
+
+    @staticmethod
+    def resetdeck():
+        CardDraw.available_cards = [j for i in [[[i, e] for i in range(13)] for e in range(4)] for j in i]
+        CardDraw.nomorecards = False
 
     def draw(self):
         screen.blit(self.image, self.image_rect)
@@ -204,26 +324,20 @@ class Actor:
         self.value = 0
         self.kqjlist = ["King!", "Queen!", "Jack!"]
         self.kingqueenjack = 10
-        self.cardoffset = 130
+        self.cardoffset = 128
         self.natural = False
 
         self.cards = []
-
-    def gethand(self, nowworth):
-        """Print's the person's hand. "nowworth" is a boolean for printing
-           "X's hand is now worth Y." instead of "X's hand is worth Y."""""
-        if nowworth:
-            message_display("%s's hand is now worth %i." % (self.name, self.value))
-        else:
-            message_display("%s's hand is worth %i." % (self.name, self.value))
 
 
 class P(Actor):
     available_money = 100
     surrendered = False
+    wins = 0
+    loses = 0
 
     def hit(self):
-        CardDraw(randint(0, 12), randint(0, 3), self, x=+64, y=121)
+        CardDraw(self, x=+64, y=121)
 
     @staticmethod
     def stand():
@@ -233,7 +347,17 @@ class P(Actor):
         actiontimer = 240
 
     def dbl_down(self):
-        pass
+        global roundstart, standing, actiontimer, Bet
+        if self.available_money >= Bet.value:
+            self.available_money -= Bet.value
+            Bet.value *= 2
+        else:
+            Bet.value += self.available_money
+            self.available_money = 0
+        CardDraw(self, x=+64, y=121)
+        roundstart = False
+        standing = True
+        actiontimer = 240
 
     def surrender(self):
         global roundstart, betting, Bet, restart, playing, actiontimer
@@ -261,11 +385,11 @@ class Money:
         self.modify_vir_waittime = 15
         self.waittime = 0
 
-    def keep_in_valid_range(self):
+    def keep_in_valid_range(self, player):
         if self.value < 0:
             self.value = 0
-        if self.value > 100000:
-            self.value = 100000
+        if self.value > player.available_money:
+            self.value = player.available_money
 
     def add(self):
         self.change_value(1)
@@ -299,6 +423,10 @@ Bet = Money()
 Player = P()
 Dealer = D()
 
+card_values = [10, 10, 10, 11, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+# available_cards = [[0, 0, 10]]
+
 increasebutton = ImgButton(16, 16, "sprites/betbuttons.png", 0, 0)
 decreasebutton = ImgButton(16, 16, "sprites/betbuttons.png", 0, 1)
 
@@ -308,6 +436,9 @@ doubledownbutton = ImgButton(122, 32, "sprites/button_doubledown.png", 0, 0)
 surrenderbutton = ImgButton(124, 32, "sprites/button_surrender.png", 0, 0)
 
 acceptbutton = ImgButton(96, 32, "sprites/acceptbutton.png", 0, 0)
+
+Gamemenu = DropMenuButton(41, 19, "sprites/dropmenu_game.png")
+Helpmenu = DropMenuButton(35, 19, "sprites/dropmenu_help.png")
 
 hold_time = 0
 hold_increase_time = 30
@@ -321,39 +452,27 @@ playing = False
 restart = False
 
 actiontimer = 0
+menutimer = 0
 
 debugmode = False
 
 won = False
 tie = False
-
+lost = False
 
 # For the card coordinates:
 # to move a centered card back to the origin for x is -(screen_width/2 - (card.width/2)), or -int(204.5)
 # to move a centered card back to the origin for y is -(screen_height/2 - (card.height/2)), or -272
 # to convert center=False coords to center=True cords, simply add the old (x, y) coords to (205, -272)
 
-
-def initgame():
-    # Player's cards:
-    CardDraw(randint(0, 12), randint(0, 3), Player, x=-64, y=121)
-    CardDraw(randint(0, 12), randint(0, 3), Player, x=+64, y=121)
-    # Dealer's card:
-    CardDraw(randint(0, 12), randint(0, 3), Dealer, x=-64, y=-152)
-
-
-def restartgame():
-    global restart
-    restart = True
-
-
 # Game loop:
 
 while True:
 
-    if restart:
+    if restart:  # Reinitializes the game loop's global variables
         Player.__init__()
         Dealer.__init__()
+        CardDraw.resetdeck()
         betting = True
         roundstart = False
         standing = False
@@ -362,16 +481,16 @@ while True:
 
         if won:  # If the player won:
             Player.available_money += Bet.value*2
+            Player.wins += 1
             won = False
-
-        if tie:  # If the player tied:
+        elif tie:  # If the player tied:
             tie = False
             Player.available_money += Bet.value
+        elif lost:
+            Player.loses += 1
+            lost = False
 
         restart = False
-
-    deltatime = deltaclock.tick(60)  # Creates the clock for Delta Time.
-    dps = deltatime/60  # Can be used for adjusting the speed of game elements if the frame-rate decreases.
 
     for event in pygame.event.get():
         if event.type == QUIT:
@@ -388,23 +507,35 @@ while True:
     if (keys_pressed[K_LALT] or keys_pressed[K_RALT]) and keys_pressed[K_F4]:
         quitgame()
 
-    # - Screen-clearing code:
+    # Screen-clearing code:
 
     screen.fill(dark_green)
 
-    # - Game logic and drawing code:
+    # Game logic and drawing code:
 
     draw_img("sprites/bottombox.png", 0, screen_height-25, center=False)
-    draw_img("sprites/menubar.png", 0, 0, center=False)
+    draw_rect(msgray, 0, 0, screen_width, 19)
+    Gamemenu.draw(action=resetstats)
+    Helpmenu.draw(x=Gamemenu.w, action=showabout)
     message_display("Money: " + str(Player.available_money), size=18, x=4, y=screen_height-24, center=False)
+    message_display("Wins: " + str(Player.wins), size=18, x=screen_width-165, y=screen_height-24, center=False)
+    message_display("Loses: " + str(Player.loses), size=18, x=screen_width-87, y=screen_height-24, center=False)
+    if CardDraw.nomorecards:
+        message = "Deck is out of cards!\nSomething terribly wrong happened...\n...or you're using debug mode."
+        ctypes.windll.user32.MessageBoxW(0, message, "Uhh...", 64)
+        restartround()
 
     # Debugging stuff:
 
-    # message_display("Dealer value: " + str(Dealer.value), size=18, x=s_w-132, y=s_h-24, center=False)
-    # message_display("Player value: " + str(Player.value), size=18, x=s_w-264, y=s_h-24, center=False)
+    if debugmode:
+        message_display("Dealer value: " + str(Dealer.value), size=18, x=4, y=22, center=False)
+        message_display("Player value: " + str(Player.value), size=18, x=4, y=40, center=False)
+        deck_len = str(len(CardDraw.available_cards))
+        message_display("Cards left in deck: " + deck_len, size=18, x=4, y=58, center=False)
 
     if betting:  # Betting stage.
-        Bet.keep_in_valid_range()
+
+        Bet.keep_in_valid_range(Player)
         draw_img("sprites/cardback.png", y=-152, colorkey=keycolor)
         message_display("Welcome to blackjack.", x=0, y=0)
         message_display("Place your bet:", x=0, y=32)
@@ -415,13 +546,10 @@ while True:
         decreasebutton.draw(x=286, y=416, action=Bet.sub)
         acceptbutton.draw(y=150, center=True, action=end_bet, act_on_release=True)
         if actiontimer:
-            if Bet.value > Player.available_money:
-                message_display("Insufficient funds.", y=200)
             if Player.surrendered:
                 if actiontimer == 1:
                     Player.surrendered = False
-                message_display("Player surrendered.", y=188)
-                message_display("House takes half of bets.", y=212)
+                message_display("House takes half of bets.", y=188)
             actiontimer -= 1
 
     if playing:  # Starts the game.
@@ -435,7 +563,7 @@ while True:
 
         if roundstart:
             message_display("Dealer's hand:", y=-225)
-            message_display("Player's hand:", y=48)
+            message_display("Your hand:", y=48)
             hitbutton.draw(x=-174, y=240, center=True, act_on_release=True, action=Player.hit)
             standbutton.draw(x=-103, y=240, center=True, act_on_release=True, action=Player.stand)
             doubledownbutton.draw(x=5, y=240, center=True, act_on_release=True, action=Player.dbl_down)
@@ -443,11 +571,11 @@ while True:
             if Player.value == 21 and len(Player.cards) == 2:
                 Player.natural = True
 
-        if standing:
+        if standing:  # Basically a loop that runs until the dealer either busts or has a hand value >= 17.
             if actiontimer > 120:
-                message_display("Player stood. Dealers turn.")
+                message_display("Standing. Dealers turn.")
             elif actiontimer == 120:
-                CardDraw(randint(0, 12), randint(0, 3), Dealer, x=64, y=-152)
+                CardDraw(Dealer, x=64, y=-152)
                 actiontimer -= 1
             if actiontimer <= 120:
                 if not Dealer.holecardrevealed:
@@ -467,56 +595,51 @@ while True:
         # Automatic win/lose conditions:
 
         if Player.natural:
-            roundstart = False
-            betting = False
-            standing = False
-            endgame = False
-            message_display("Player got a natural 21!")
+            endround()
+            message_display("You got a natural 21!")
             message_display("You win!", y=24)
             won = True
-            acceptbutton.draw(y=240, center=True, action=restartgame, act_on_release=True)
-
+            acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
         if Player.value > 21 and not debugmode:
             if Player.gotace and Player.acecount == 0:
                 Player.value -= 10
                 Player.acecount += 1
             else:
-                roundstart = False
-                betting = False
-                standing = False
-                endgame = False
-                message_display("Player busted.")
+                endround()
+                message_display("Busted!")
                 message_display("You lose.", y=24)
-                acceptbutton.draw(y=240, center=True, action=restartgame, act_on_release=True)
+                lost = True
+                acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
         if Dealer.value > 21:
             if Dealer.gotace and Dealer.acecount == 0:
                 Dealer.value -= 10
                 Dealer.acecount += 1
             else:
-                roundstart = False
-                betting = False
-                standing = False
-                endgame = False
+                endround()
                 message_display("Dealer busted.")
                 message_display("You win!", y=24)
                 won = True
-                acceptbutton.draw(y=240, center=True, action=restartgame, act_on_release=True)
+                acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
 
         # Win/Lose conditions:
 
         if endgame:
             if Player.value > Dealer.value:
-                message_display("Player's hand is greater than dealer's.")
+                message_display("Your hand is greater than dealer's.")
                 message_display("You win!", y=24)
                 won = True
             elif Player.value < Dealer.value:
-                message_display("Player's hand is less than dealer's.")
+                message_display("Your hand is less than dealer's.")
                 message_display("You lose.", y=24)
+                lost = True
             else:
-                message_display("Player's hand is equal to dealer's.")
+                message_display("Your hand is equal to dealer's.")
                 message_display("Tie.", y=24)
                 tie = True
-            acceptbutton.draw(y=240, center=True, action=restartgame, act_on_release=True)
+            acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
+
+    if menutimer > 0:
+        menutimer -= 1
 
     pygame.display.update()
     fpsclock.tick(60)
