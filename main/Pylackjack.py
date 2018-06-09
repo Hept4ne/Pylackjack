@@ -28,7 +28,6 @@ msgray = (189, 189, 189)
 # Global variables:
 
 fpsclock = pygame.time.Clock()
-deltaclock = pygame.time.Clock()
 
 (screen_width, screen_height) = (480, 640)
 screen_centerx = (screen_width/2)
@@ -38,7 +37,7 @@ screen_centery = (screen_height/2)
 screen = pygame.display.set_mode((screen_width, screen_height))
 screen_rect = screen.get_rect()
 
-# Todo: WRITE MORE COMMENTS! refactor/simplify more! add polish!
+# TODO: alter how cards are displayed (make them centered), add splitting
 
 # Functions:
 
@@ -122,6 +121,7 @@ def endround():
     betting = False
     standing = False
     endgame = False
+
 
 def showabout():
     """Displays the about message."""
@@ -217,6 +217,7 @@ class DropMenuButton:
             self.dropmenu.image_rect.x = screen_width
         if (mouse[1] > image_rect.y + self.h + self.dropmenu.h) and DropMenuButton.activate:
             DropMenuButton.activate = False
+        # The code for this is honestly a mess... it needs to be fixed.
         screen.blit(image, image_rect)
 
 
@@ -268,8 +269,11 @@ class CardDraw(pygame.sprite.Sprite):
     height = 96
     center = (screen_centerx - (width/2), screen_centery - (height/2))
 
+    # These two variables define the card values and create the deck of cards:
+
     card_values = [10, 10, 10, 11, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     available_cards = [j for i in [[[i, e] for i in range(13)] for e in range(4)] for j in i]
+
     nomorecards = False
 
     def __init__(self, targetactor, x=0, y=0, center=True):
@@ -278,10 +282,10 @@ class CardDraw(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
 
         if not CardDraw.available_cards:  # Exception handling for when the deck runs out of cards.
-            CardDraw.nomorecards = True  # Under normal gameplay circumstances, it is impossible for this to happen.
+            CardDraw.nomorecards = True  # Under normal gameplay conditions, it is impossible for this to happen.
         else:
-            cchoice, csuit = choice(CardDraw.available_cards)
-            CardDraw.available_cards.remove([cchoice, csuit])
+            cchoice, csuit = choice(CardDraw.available_cards)  # Randomly chooses a card.
+            CardDraw.available_cards.remove([cchoice, csuit])  # Removes the chosen card from the deck.
             self.index = (CardDraw.cix * csuit, CardDraw.ciy * cchoice, CardDraw.width, CardDraw.height)
             self.image = CardDraw.cards.image_at(self.index, colorkey=keycolor)
             self.image_rect = self.image.get_rect()
@@ -291,11 +295,14 @@ class CardDraw(pygame.sprite.Sprite):
             else:
                 self.image_rect.x = x
                 self.image_rect.y = y
-            targetactor.value += self.value
-            targetactor.cards.append(self)
-            if cchoice == 3:
+            targetactor.value += self.value  # Increases the target actor's hand value.
+            targetactor.cards.append(self)  # Adds the card to the target actor's hand.
+            if cchoice == 3:  # If the chosen card is an ace...
                 targetactor.gotace = True
             if len(targetactor.cards) > 2:
+                # For rendering purposes.
+                # Puts the last card on top of the target actor's displayed hand of previous cards.
+                # Each successive card is offset a bit so the previous card(s) can still be seen.
                 targetactor.cards[-1].image_rect.x = targetactor.cardoffset
                 if targetactor.cardoffset <= 8:
                     targetactor.cardoffset = 128
@@ -304,15 +311,17 @@ class CardDraw(pygame.sprite.Sprite):
 
     @staticmethod
     def resetdeck():
+        """Resets the deck of cards."""
         CardDraw.available_cards = [j for i in [[[i, e] for i in range(13)] for e in range(4)] for j in i]
         CardDraw.nomorecards = False
 
     def draw(self):
+        """Renders the cards on the screen."""
         screen.blit(self.image, self.image_rect)
 
 
 class Actor:
-    """Actor class for variables and methods shared by player and dealer."""
+    """Actor class for instance variables shared by the player and dealer."""
 
     def __init__(self):
         self.name = self
@@ -331,22 +340,26 @@ class Actor:
 
 
 class P(Actor):
+    """Player class. Inherits from the Dealer class."""
     available_money = 100
     surrendered = False
     wins = 0
     loses = 0
 
     def hit(self):
+        """Adds a card to the player's hand."""
         CardDraw(self, x=+64, y=121)
 
     @staticmethod
     def stand():
+        """Makes the player stand - i.e. ends their turn."""
         global roundstart, standing, actiontimer
         roundstart = False
         standing = True
         actiontimer = 240
 
     def dbl_down(self):
+        """Doubles down - Increases their bet by a maximum of 100% and stands after the next hit."""
         global roundstart, standing, actiontimer, Bet
         if self.available_money >= Bet.value:
             self.available_money -= Bet.value
@@ -360,6 +373,7 @@ class P(Actor):
         actiontimer = 240
 
     def surrender(self):
+        """Surrenders, instantly ending the the game and returning 1/2 of the player's bet."""
         global roundstart, betting, Bet, restart, playing, actiontimer
         betting = True
         roundstart = False
@@ -372,11 +386,13 @@ class P(Actor):
 
 
 class D(Actor):
+    """Dealer class. Inherits from the Actor class."""
     holecardrevealed = False
 
 
-class Money:
-    value = 100
+class Betobject:
+    """Class for the money used in the bet."""
+    value = 100  # Default bet value.
 
     def __init__(self):
         self.modifywait = 15  # The delay between each successive increment or decrement of the value.
@@ -386,18 +402,23 @@ class Money:
         self.waittime = 0
 
     def keep_in_valid_range(self, player):
+        """Keeps the bet from exceeding the player's available funds."""
         if self.value < 0:
             self.value = 0
         if self.value > player.available_money:
             self.value = player.available_money
 
     def add(self):
+        """Adds to the bet."""
         self.change_value(1)
 
     def sub(self):
+        """Subtracts from the bet."""
         self.change_value(-1)
 
     def change_value(self, n):
+        """Changes the bet's value. The speed of the change increases as the button is held,
+           then resets when released."""
         if self.waittime < 1:
             self.value += n * (2 ** self.modify_value_increase_rate)
             self.waittime += self.modifywait
@@ -413,12 +434,13 @@ class Money:
             self.modify_vir_waittime -= 1
 
     def reset_bet(self):
+        """Resets the bet to its default value."""
         self.value = 100
 
 
 # Variables inheriting from the classes, and other useful game-loop global variables:
 
-Bet = Money()
+Bet = Betobject()
 
 Player = P()
 Dealer = D()
@@ -535,7 +557,7 @@ while True:
 
     if betting:  # Betting stage.
 
-        Bet.keep_in_valid_range(Player)
+        Bet.keep_in_valid_range(Player)  # Keeps the bet in the valid range.
         draw_img("sprites/cardback.png", y=-152, colorkey=keycolor)
         message_display("Welcome to blackjack.", x=0, y=0)
         message_display("Place your bet:", x=0, y=32)
@@ -554,14 +576,16 @@ while True:
 
     if playing:  # Starts the game.
 
+        # Renders the player and dealer's cards:
         for card in Player.cards:
             card.draw()
         for card in Dealer.cards:
             card.draw()
-        if len(Dealer.cards) < 2:
+        if len(Dealer.cards) < 2:  # Renders a card's backside for the hole card.
             draw_img("sprites/cardback.png", x=64, y=-152, colorkey=keycolor)
 
-        if roundstart:
+        if roundstart:  # Start of the round. Lets the player make their moves until they either stand or bust.
+            # Getting a natural 21 bypasses this.
             message_display("Dealer's hand:", y=-225)
             message_display("Your hand:", y=48)
             hitbutton.draw(x=-174, y=240, center=True, act_on_release=True, action=Player.hit)
@@ -572,21 +596,21 @@ while True:
                 Player.natural = True
 
         if standing:  # Basically a loop that runs until the dealer either busts or has a hand value >= 17.
-            if actiontimer > 120:
+            if actiontimer > 120:  # Action timer starts at 240, so at 60 fps this will display for two seconds.
                 message_display("Standing. Dealers turn.")
-            elif actiontimer == 120:
+            elif actiontimer == 120:  # Draws a card after two seconds.
                 CardDraw(Dealer, x=64, y=-152)
                 actiontimer -= 1
             if actiontimer <= 120:
-                if not Dealer.holecardrevealed:
+                if not Dealer.holecardrevealed:  # If the dealer's hole card hasn't been revealed yet...
                     message_display("Dealer's hole card revealed.")
-                if Dealer.holecardrevealed:
+                if Dealer.holecardrevealed:  # If the hole card has already been revealed...
                     message_display("Dealer hits.")
-            if not actiontimer and Dealer.value < 17:
+            if not actiontimer and Dealer.value < 17:  # If the action timer runs out but the dealer's hand is < 17...
                 # Dealer doesn't stop hitting until their hand is at least 17.
                 Dealer.holecardrevealed = True
                 actiontimer = 120
-            elif not actiontimer and Dealer.value >= 17:
+            elif not actiontimer and Dealer.value >= 17:  # Dealer's turn ends when their hand is >= 17.
                 endgame = True
                 standing = False
             else:
@@ -594,7 +618,7 @@ while True:
 
         # Automatic win/lose conditions:
 
-        if Player.natural:
+        if Player.natural:  # If the player's two initial cards == 21 (automatic win):
             endround()
             message_display("You got a natural 21!")
             message_display("You win!", y=24)
@@ -602,9 +626,10 @@ while True:
             acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
         if Player.value > 21 and not debugmode:
             if Player.gotace and Player.acecount == 0:
+                # Changes the ace's value to 1 if the player has ONE ace and busts on a "soft" hand.
                 Player.value -= 10
                 Player.acecount += 1
-            else:
+            else:  # If the player busts and has no ace, or has one ace and "hard" busts (hand value > 31):
                 endround()
                 message_display("Busted!")
                 message_display("You lose.", y=24)
@@ -612,9 +637,10 @@ while True:
                 acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
         if Dealer.value > 21:
             if Dealer.gotace and Dealer.acecount == 0:
+                # Changes the ace's value to 1 if the dealer has ONE ace and busts on a "soft" hand.
                 Dealer.value -= 10
                 Dealer.acecount += 1
-            else:
+            else:  # If the dealer busts and has no ace, or has one ace and "hard" busts (hand value > 31):
                 endround()
                 message_display("Dealer busted.")
                 message_display("You win!", y=24)
