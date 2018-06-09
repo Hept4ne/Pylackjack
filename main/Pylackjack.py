@@ -37,7 +37,7 @@ screen_centery = (screen_height/2)
 screen = pygame.display.set_mode((screen_width, screen_height))
 screen_rect = screen.get_rect()
 
-# TODO: alter how cards are displayed (make them centered), add splitting
+# TODO: fix resetting stats after winning/losing not clearing the won/lost variable, add splitting
 
 # Functions:
 
@@ -103,10 +103,10 @@ def draw_img(img, x=0, y=0, center=True, colorkey=magenta):
 def initround():
     """Gives the player and dealer their initial cards at the start of the round."""
     # Player's cards:
-    CardDraw(Player, x=-64, y=121)
-    CardDraw(Player, x=+64, y=121)
+    CardDraw(Player, y=121)
+    CardDraw(Player, y=121)
     # Dealer's card:
-    CardDraw(Dealer, x=-64, y=-152)
+    CardDraw(Dealer, y=-152)
 
 
 def restartround():
@@ -299,15 +299,14 @@ class CardDraw(pygame.sprite.Sprite):
             targetactor.cards.append(self)  # Adds the card to the target actor's hand.
             if cchoice == 3:  # If the chosen card is an ace...
                 targetactor.gotace = True
-            if len(targetactor.cards) > 2:
+            if len(targetactor.cards) > 1:
                 # For rendering purposes.
-                # Puts the last card on top of the target actor's displayed hand of previous cards.
-                # Each successive card is offset a bit so the previous card(s) can still be seen.
-                targetactor.cards[-1].image_rect.x = targetactor.cardoffset
-                if targetactor.cardoffset <= 8:
-                    targetactor.cardoffset = 128
-                else:
-                    targetactor.cardoffset -= 12
+                # Puts the new card on top of the hand (slightly offset so the prev card's value is visible)...
+                # ...then moves the hand over by half of the offset so it remains centered
+                targetactor.cards[-1].image_rect.x = self.center[0] + targetactor.cardoffset
+                for c in range(len(targetactor.cards)-1):
+                    targetactor.cards[c].image_rect.x -= 7
+                targetactor.cardoffset += 7
 
     @staticmethod
     def resetdeck():
@@ -333,7 +332,7 @@ class Actor:
         self.value = 0
         self.kqjlist = ["King!", "Queen!", "Jack!"]
         self.kingqueenjack = 10
-        self.cardoffset = 128
+        self.cardoffset = 7
         self.natural = False
 
         self.cards = []
@@ -348,7 +347,7 @@ class P(Actor):
 
     def hit(self):
         """Adds a card to the player's hand."""
-        CardDraw(self, x=+64, y=121)
+        CardDraw(self, y=121)
 
     @staticmethod
     def stand():
@@ -367,7 +366,7 @@ class P(Actor):
         else:
             Bet.value += self.available_money
             self.available_money = 0
-        CardDraw(self, x=+64, y=121)
+        CardDraw(self, y=121)
         roundstart = False
         standing = True
         actiontimer = 240
@@ -581,8 +580,6 @@ while True:
             card.draw()
         for card in Dealer.cards:
             card.draw()
-        if len(Dealer.cards) < 2:  # Renders a card's backside for the hole card.
-            draw_img("sprites/cardback.png", x=64, y=-152, colorkey=keycolor)
 
         if roundstart:  # Start of the round. Lets the player make their moves until they either stand or bust.
             # Getting a natural 21 bypasses this.
@@ -599,7 +596,7 @@ while True:
             if actiontimer > 120:  # Action timer starts at 240, so at 60 fps this will display for two seconds.
                 message_display("Standing. Dealers turn.")
             elif actiontimer == 120:  # Draws a card after two seconds.
-                CardDraw(Dealer, x=64, y=-152)
+                CardDraw(Dealer, y=-152)
                 actiontimer -= 1
             if actiontimer <= 120:
                 if not Dealer.holecardrevealed:  # If the dealer's hole card hasn't been revealed yet...
