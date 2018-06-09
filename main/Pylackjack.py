@@ -37,7 +37,7 @@ screen_centery = (screen_height/2)
 screen = pygame.display.set_mode((screen_width, screen_height))
 screen_rect = screen.get_rect()
 
-# TODO: fix resetting stats after winning/losing not clearing the won/lost variable, add splitting
+# TODO: add splitting, fix drop menu code
 
 # Functions:
 
@@ -116,6 +116,7 @@ def restartround():
 
 
 def endround():
+    """Ends the round."""
     global roundstart, betting, standing, endgame
     roundstart = False
     betting = False
@@ -125,17 +126,14 @@ def endround():
 
 def showabout():
     """Displays the about message."""
-    creditsmessage = "Pylackjack 0.9\nCopyright (c) 2018 Hexadecane\nLicensed under the MIT License"
+    creditsmessage = "Pylackjack 1.02\nCopyright (c) 2018 Hexadecane\nLicensed under the MIT License"
     ctypes.windll.user32.MessageBoxW(0, creditsmessage, "About", 64)
 
 
 def resetstats():
     """Resets the player's stats, and the bet value."""
-    global Player, Bet
-    Player.available_money = 100
-    Player.wins = 0
-    Player.loses = 0
-    Bet.value = 100
+    global resettingstats
+    resettingstats = True
     restartround()
 
 
@@ -149,6 +147,21 @@ def sprite_set(w, h, spritesheet, x, y, sloc_n, sloc_y=0):
     image_rect.x = x
     image_rect.y = y
     return index, image, image_rect, image_rect.x, image_rect.y
+
+
+def winlose(target, gamewon=False, tie=False):
+    """Modifies the player's win-lose statistics."""
+    global winlose_inc, Bet
+    if not winlose_inc:
+        if tie:
+            target.available_money += Bet.value
+        else:
+            if gamewon:
+                target.available_money += Bet.value*2
+                target.wins += 1
+            else:
+                target.loses += 1
+        winlose_inc = True
 
 
 # Classes:
@@ -471,16 +484,13 @@ standing = False
 endgame = False
 playing = False
 restart = False
+resettingstats = False
+winlose_inc = False
 
 actiontimer = 0
 menutimer = 0
 
 debugmode = False
-
-won = False
-tie = False
-lost = False
-
 # For the card coordinates:
 # to move a centered card back to the origin for x is -(screen_width/2 - (card.width/2)), or -int(204.5)
 # to move a centered card back to the origin for y is -(screen_height/2 - (card.height/2)), or -272
@@ -499,17 +509,14 @@ while True:
         standing = False
         endgame = False
         playing = False
+        winlose_inc = False
 
-        if won:  # If the player won:
-            Player.available_money += Bet.value*2
-            Player.wins += 1
-            won = False
-        elif tie:  # If the player tied:
-            tie = False
-            Player.available_money += Bet.value
-        elif lost:
-            Player.loses += 1
-            lost = False
+        if resettingstats:
+            Player.available_money = 100
+            Player.wins = 0
+            Player.loses = 0
+            Bet.value = 100
+            resettingstats = False
 
         restart = False
 
@@ -558,8 +565,8 @@ while True:
 
         Bet.keep_in_valid_range(Player)  # Keeps the bet in the valid range.
         draw_img("sprites/cardback.png", y=-152, colorkey=keycolor)
-        message_display("Welcome to blackjack.", x=0, y=0)
-        message_display("Place your bet:", x=0, y=32)
+        message_display("Welcome to blackjack.", x=0, y=-14)
+        message_display("Place your bet:", x=0, y=14)
         draw_img("sprites/betbox.png", 178, 400, center=False)
         numoffset = (len(str(Bet.value)) - 3) * 8
         message_display(str(Bet.value), x=16-numoffset, y=96, size=28)
@@ -617,9 +624,9 @@ while True:
 
         if Player.natural:  # If the player's two initial cards == 21 (automatic win):
             endround()
-            message_display("You got a natural 21!")
-            message_display("You win!", y=24)
-            won = True
+            message_display("You got a natural 21!", y=-14)
+            message_display("You win!", y=14)
+            winlose(Player, gamewon=True)
             acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
         if Player.value > 21 and not debugmode:
             if Player.gotace and Player.acecount == 0:
@@ -628,9 +635,9 @@ while True:
                 Player.acecount += 1
             else:  # If the player busts and has no ace, or has one ace and "hard" busts (hand value > 31):
                 endround()
-                message_display("Busted!")
-                message_display("You lose.", y=24)
-                lost = True
+                message_display("Busted!", y=-14)
+                message_display("You lose.", y=14)
+                winlose(Player, gamewon=False)
                 acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
         if Dealer.value > 21:
             if Dealer.gotace and Dealer.acecount == 0:
@@ -639,26 +646,26 @@ while True:
                 Dealer.acecount += 1
             else:  # If the dealer busts and has no ace, or has one ace and "hard" busts (hand value > 31):
                 endround()
-                message_display("Dealer busted.")
-                message_display("You win!", y=24)
-                won = True
+                message_display("Dealer busted.", y=-14)
+                message_display("You win!", y=14)
+                winlose(Player, gamewon=True)
                 acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
 
         # Win/Lose conditions:
 
         if endgame:
             if Player.value > Dealer.value:
-                message_display("Your hand is greater than dealer's.")
-                message_display("You win!", y=24)
-                won = True
+                message_display("Your hand is greater than dealer's.", y=-14)
+                message_display("You win!", y=14)
+                winlose(Player, gamewon=True)
             elif Player.value < Dealer.value:
-                message_display("Your hand is less than dealer's.")
-                message_display("You lose.", y=24)
-                lost = True
+                message_display("Your hand is less than dealer's.", y=-14)
+                message_display("You lose.", y=14)
+                winlose(Player, gamewon=False)
             else:
-                message_display("Your hand is equal to dealer's.")
-                message_display("Tie.", y=24)
-                tie = True
+                message_display("Your hand is equal to dealer's.", y=-14)
+                message_display("Tie.", y=14)
+                winlose(Player, tie=True)
             acceptbutton.draw(y=240, center=True, action=restartround, act_on_release=True)
 
     if menutimer > 0:
