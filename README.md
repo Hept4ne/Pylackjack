@@ -1,6 +1,6 @@
 # Pylackjack, a.k.a. Python Blackjack.
 
----Created by J. H. a.k.a. Hexadecane.---
+---Created by Hexadecane.---
 
 Tools used: PyCharm, Aseprite
 
